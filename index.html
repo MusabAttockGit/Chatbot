@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Musab AI Voice Call</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+      color: white;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .container {
+      background: rgba(255,255,255,0.1);
+      backdrop-filter: blur(10px);
+      border-radius: 20px;
+      padding: 40px;
+      max-width: 600px;
+      width: 90%;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 10px;
+      font-size: 2rem;
+    }
+    .status {
+      text-align: center;
+      margin-bottom: 30px;
+      padding: 10px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 10px;
+      font-size: 0.9rem;
+    }
+    .status.connected { background: rgba(40,167,69,0.3); }
+    .status.disconnected { background: rgba(220,53,69,0.3); }
+    .button {
+      width: 100%;
+      padding: 15px;
+      margin: 10px 0;
+      border: none;
+      border-radius: 10px;
+      font-size: 1.1rem;
+      cursor: pointer;
+      transition: all 0.3s;
+      font-weight: bold;
+    }
+    .button:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+    .btn-primary { background: #28a745; color: white; }
+    .btn-danger { background: #dc3545; color: white; }
+    .btn-secondary { background: #6c757d; color: white; }
+    .hidden { display: none; }
+    .chat-box {
+      background: rgba(0,0,0,0.3);
+      border-radius: 10px;
+      padding: 20px;
+      margin: 20px 0;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    .message {
+      margin: 10px 0;
+      padding: 10px;
+      border-radius: 8px;
+    }
+    .user { background: rgba(0,123,255,0.3); text-align: right; }
+    .assistant { background: rgba(40,167,69,0.3); }
+    #micButton {
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      background: #dc3545;
+      border: 5px solid rgba(255,255,255,0.3);
+      margin: 20px auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 3rem;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    #micButton:active { transform: scale(0.95); background: #c82333; }
+    #micButton.recording { 
+      background: #28a745;
+      animation: pulse 1s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(40,167,69,0.7); }
+      50% { box-shadow: 0 0 0 20px rgba(40,167,69,0); }
+    }
+    .controls {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎤 Musab AI Voice Call</h1>
+    
+    <div id="status" class="status disconnected">
+      🔴 Connecting to server...
+    </div>
+
+    <!-- Pre-Call -->
+    <div id="preCall">
+      <p style="text-align: center; margin-bottom: 20px;">
+        Start a voice call with your AI immigration assistant
+      </p>
+      <button class="button btn-primary" onclick="startCall()">
+        📞 Start Voice Call
+      </button>
+      <a href="/add_data" style="display: block; text-align: center; margin-top: 20px; color: white;">
+        📚 Manage Knowledge Base
+      </a>
+    </div>
+
+    <!-- Active Call -->
+    <div id="activeCall" class="hidden">
+      <div class="chat-box" id="chatBox"></div>
+      
+      <div id="micButton">🎤</div>
+      <p style="text-align: center; font-size: 0.9rem; opacity: 0.8;">
+        Press and hold to speak
+      </p>
+
+      <div class="controls">
+        <button class="button btn-secondary" onclick="toggleMute()">
+          <span id="muteText">🔇 Mute</span>
+        </button>
+        <button class="button btn-danger" onclick="endCall()">
+          📞 End Call
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+  <script>
+    let socket;
+    let recognition;
+    let synthesis = window.speechSynthesis;
+    let isRecording = false;
+    let isMuted = false;
+    let isCallActive = false;
+
+    // Connect to server
+    window.addEventListener('load', () => {
+      socket = io();
+      
+      socket.on('connect', () => {
+        updateStatus('🟢 Connected - Ready to call', 'connected');
+      });
+      
+      socket.on('disconnect', () => {
+        updateStatus('🔴 Disconnected from server', 'disconnected');
+      });
+      
+      socket.on('voice_response', (data) => {
+        addMessage('assistant', data.text);
+        speak(data.text);
+      });
+
+      // Setup speech recognition
+      if ('webkitSpeechRecognition' in window) {
+        recognition = new webkitSpeechRecognition();
+        recognition.continuous = false;
+        recognition.interimResults = false;
+        
+        recognition.onresult = (event) => {
+          const text = event.results[0][0].transcript;
+          addMessage('user', text);
+          socket.emit('voice_input', { text: text });
+        };
+        
+        recognition.onerror = (event) => {
+          console.error('Speech recognition error:', event.error);
+        };
+      } else {
+        alert('Speech recognition not supported. Use Chrome or Edge.');
+      }
+    });
+
+    function startCall() {
+      if (!recognition) {
+        alert('Speech recognition not available!');
+        return;
+      }
+      
+      isCallActive = true;
+      document.getElementById('preCall').classList.add('hidden');
+      document.getElementById('activeCall').classList.remove('hidden');
+      updateStatus('🟢 Call Active', 'connected');
+      
+      speak('Hello! I am your Irish immigration assistant. How can I help you?');
+    }
+
+    function endCall() {
+      isCallActive = false;
+      document.getElementById('activeCall').classList.add('hidden');
+      document.getElementById('preCall').classList.remove('hidden');
+      document.getElementById('chatBox').innerHTML = '';
+      synthesis.cancel();
+      updateStatus('🟢 Connected - Ready to call', 'connected');
+    }
+
+    function toggleMute() {
+      isMuted = !isMuted;
+      const text = document.getElementById('muteText');
+      text.textContent = isMuted ? '🔊 Unmute' : '🔇 Mute';
+    }
+
+    // Mic button - Press and hold
+    const micBtn = document.getElementById('micButton');
+    
+    micBtn.addEventListener('mousedown', startRecording);
+    micBtn.addEventListener('mouseup', stopRecording);
+    micBtn.addEventListener('touchstart', startRecording);
+    micBtn.addEventListener('touchend', stopRecording);
+
+    function startRecording() {
+      if (!isCallActive || isMuted || !recognition) return;
+      
+      isRecording = true;
+      micBtn.classList.add('recording');
+      
+      try {
+        recognition.start();
+      } catch(e) {
+        console.log('Recognition already started');
+      }
+    }
+
+    function stopRecording() {
+      if (!isRecording) return;
+      
+      isRecording = false;
+      micBtn.classList.remove('recording');
+      
+      if (recognition) {
+        recognition.stop();
+      }
+    }
+
+    function addMessage(role, text) {
+      const chatBox = document.getElementById('chatBox');
+      const msg = document.createElement('div');
+      msg.className = 'message ' + role;
+      msg.textContent = text;
+      chatBox.appendChild(msg);
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    function speak(text) {
+      synthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
+      synthesis.speak(utterance);
+    }
+
+    function updateStatus(text, className) {
+      const status = document.getElementById('status');
+      status.textContent = text;
+      status.className = 'status ' + className;
+    }
+  </script>
+</body>
+</html>

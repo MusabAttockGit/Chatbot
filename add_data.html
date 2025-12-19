@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Musab AI - Voice Call Assistant</title>
+
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  
+  <!-- Socket.IO -->
+  <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+  
+  <!-- Custom Styles -->
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 font-inter text-white overflow-hidden">
+
+  <div class="app-container max-w-7xl mx-auto flex h-screen gap-6 p-6">
+
+    <!-- ==================== SIDEBAR ==================== -->
+    <aside class="sidebar glass-panel rounded-2xl p-6 flex flex-col gap-6 w-80">
+      
+      <!-- Logo Section -->
+      <div class="logo-section flex items-center gap-3">
+        <div class="logo w-14 h-14 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-2xl">
+          <i data-lucide="phone" class="w-7 h-7 text-white"></i>
+        </div>
+        <div>
+          <div class="text-xl font-bold text-blue-400">Musab AI</div>
+          <div class="text-sm text-slate-400">Voice Call Assistant</div>
+        </div>
+      </div>
+
+      <!-- Call Controls -->
+      <div class="call-controls flex flex-col gap-3">
+        <button id="startCallBtn" class="btn-primary flex items-center justify-center gap-2">
+          <i data-lucide="phone-call" class="w-5 h-5"></i>
+          <span>Start Voice Call</span>
+        </button>
+        <button id="endCallBtn" class="btn-danger hidden flex items-center justify-center gap-2">
+          <i data-lucide="phone-off" class="w-5 h-5"></i>
+          <span>End Call</span>
+        </button>
+      </div>
+
+      <!-- Call Status -->
+      <div class="status-section glass-inner rounded-xl p-4">
+        <div class="text-xs text-slate-400 mb-2">Call Status</div>
+        <div id="callStatus" class="flex items-center gap-2 text-sm">
+          <div class="status-dot bg-slate-500"></div>
+          <span>Ready to call</span>
+        </div>
+        <div id="callTimer" class="text-2xl font-mono mt-3 text-blue-400 hidden">00:00</div>
+      </div>
+
+      <!-- Voice Controls (Hidden until call active) -->
+      <div id="voiceControls" class="voice-controls hidden flex flex-col gap-3">
+        <button id="muteBtn" class="btn-secondary flex items-center justify-center gap-2">
+          <i data-lucide="mic" class="w-5 h-5"></i>
+          <span>Mute</span>
+        </button>
+        <button id="holdBtn" class="btn-secondary flex items-center justify-center gap-2">
+          <i data-lucide="pause" class="w-5 h-5"></i>
+          <span>Hold</span>
+        </button>
+      </div>
+
+      <!-- Navigation -->
+      <nav class="flex flex-col gap-2 mt-auto">
+        <a href="/" class="nav-item nav-active">
+          <i data-lucide="phone" class="w-5 h-5"></i>
+          <span>Voice Call</span>
+        </a>
+        <a href="/add_data" class="nav-item">
+          <i data-lucide="database" class="w-5 h-5"></i>
+          <span>Knowledge Base</span>
+        </a>
+      </nav>
+
+      <!-- System Status -->
+      <div class="system-status text-xs space-y-2">
+        <div class="text-slate-500 mb-2">System Status</div>
+        <div id="ragStatus" class="flex items-center gap-2">
+          <div class="w-2 h-2 rounded-full bg-slate-500"></div>
+          <span class="text-slate-400">RAG: Checking...</span>
+        </div>
+        <div id="micStatus" class="flex items-center gap-2">
+          <div class="w-2 h-2 rounded-full bg-slate-500"></div>
+          <span class="text-slate-400">Microphone: Not connected</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ==================== MAIN CALL AREA ==================== -->
+    <main class="call-area flex-1 flex flex-col rounded-2xl overflow-hidden">
+      
+      <!-- Header -->
+      <header class="call-header p-6 glass-panel flex items-center justify-between">
+        <div>
+          <div class="text-2xl font-bold text-blue-400">Voice Call Interface</div>
+          <div class="text-sm text-slate-400">Speak naturally - AI responds in real-time</div>
+        </div>
+        <div class="flex gap-2">
+          <button id="settingsBtn" class="glass-btn p-3 rounded-lg" title="Settings">
+            <i data-lucide="settings" class="w-5 h-5"></i>
+          </button>
+        </div>
+      </header>
+
+      <!-- Call Display Area -->
+      <section class="flex-1 flex items-center justify-center p-8 overflow-hidden">
+        
+        <!-- ========== PRE-CALL STATE ========== -->
+        <div id="preCallState" class="text-center w-full">
+          <div class="call-icon-large mb-6 inline-block">
+            <i data-lucide="phone" class="w-24 h-24 text-blue-400"></i>
+          </div>
+          <h2 class="text-3xl font-bold mb-3">Ready to Start Your Call</h2>
+          <p class="text-slate-400 mb-8 max-w-md mx-auto">
+            Click "Start Voice Call" to begin speaking with your AI immigration consultant.
+            Make sure your microphone is enabled.
+          </p>
+          
+          <!-- Features Grid -->
+          <div class="features-grid grid grid-cols-3 gap-4 max-w-2xl mx-auto">
+            <div class="feature-card glass-inner p-4 rounded-xl hover:bg-slate-800/30 transition">
+              <i data-lucide="mic" class="w-8 h-8 text-blue-400 mx-auto mb-2"></i>
+              <div class="text-sm font-medium">Voice Input</div>
+              <div class="text-xs text-slate-500 mt-1">Speech recognition</div>
+            </div>
+            <div class="feature-card glass-inner p-4 rounded-xl hover:bg-slate-800/30 transition">
+              <i data-lucide="brain" class="w-8 h-8 text-blue-400 mx-auto mb-2"></i>
+              <div class="text-sm font-medium">AI Processing</div>
+              <div class="text-xs text-slate-500 mt-1">RAG-powered answers</div>
+            </div>
+            <div class="feature-card glass-inner p-4 rounded-xl hover:bg-slate-800/30 transition">
+              <i data-lucide="volume-2" class="w-8 h-8 text-blue-400 mx-auto mb-2"></i>
+              <div class="text-sm font-medium">Voice Response</div>
+              <div class="text-xs text-slate-500 mt-1">Natural speech</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ========== ACTIVE CALL STATE ========== -->
+        <div id="activeCallState" class="hidden w-full max-w-4xl flex flex-col h-full">
+          
+          <!-- Audio Visualizer -->
+          <div class="audio-visualizer-container mb-6 flex justify-center">
+            <div class="audio-visualizer">
+              <canvas id="visualizer" width="400" height="100" class="rounded-lg"></canvas>
+            </div>
+          </div>
+
+          <!-- Conversation Display -->
+          <div id="conversationPane" class="conversation-pane glass-inner rounded-2xl p-6 mb-6 overflow-y-auto flex-1">
+            <!-- Messages will be added here dynamically -->
+          </div>
+
+          <!-- Speaking Indicator (Shown when recording) -->
+          <div id="speakingIndicator" class="speaking-indicator hidden mx-auto mb-6">
+            <div class="pulse-ring"></div>
+            <div class="pulse-ring delay-1"></div>
+            <div class="pulse-ring delay-2"></div>
+            <i data-lucide="mic" class="w-12 h-12 text-blue-400"></i>
+          </div>
+
+          <!-- Push to Talk Button -->
+          <div class="text-center">
+            <button id="pushToTalkBtn" class="ptt-button mx-auto">
+              <i data-lucide="mic" class="w-8 h-8"></i>
+              <span class="mt-2 text-sm font-medium">Hold to Speak</span>
+            </button>
+            <div class="text-xs text-slate-400 mt-3">
+              Press and hold to speak • Release to send
+            </div>
+          </div>
+
+        </div>
+
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ==================== PERMISSION MODAL ==================== -->
+  <div id="permissionModal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content glass-panel rounded-2xl p-8 max-w-md relative z-10">
+      <div class="text-center mb-6">
+        <div class="w-16 h-16 rounded-full bg-blue-500/20 flex items-center justify-center mx-auto mb-4">
+          <i data-lucide="mic" class="w-8 h-8 text-blue-400"></i>
+        </div>
+        <h3 class="text-2xl font-bold mb-2">Microphone Access Required</h3>
+        <p class="text-slate-400">
+          We need access to your microphone to enable voice calls. 
+          Your audio is processed securely and not stored.
+        </p>
+      </div>
+      <div class="flex gap-3">
+        <button id="grantPermissionBtn" class="btn-primary flex-1">
+          Grant Permission
+        </button>
+        <button id="cancelPermissionBtn" class="btn-secondary flex-1">
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== SETTINGS MODAL ==================== -->
+  <div id="settingsModal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content glass-panel rounded-2xl p-8 max-w-lg relative z-10">
+      <div class="flex items-center justify-between mb-6">
+        <h3 class="text-2xl font-bold">Voice Settings</h3>
+        <button id="closeSettingsBtn" class="glass-btn p-2 rounded-lg">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      
+      <div class="settings-form space-y-6">
+        <!-- Voice Speed -->
+        <div>
+          <label class="block text-sm font-medium mb-2 text-slate-300">
+            Voice Speed
+          </label>
+          <input 
+            type="range" 
+            id="voiceSpeed" 
+            min="0.5" 
+            max="2" 
+            step="0.1" 
+            value="1" 
+            class="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"
+          >
+          <div class="text-xs text-slate-400 mt-2 flex justify-between">
+            <span>Slower</span>
+            <span>Current: <span id="speedValue" class="text-blue-400">1.0</span>x</span>
+            <span>Faster</span>
+          </div>
+        </div>
+        
+        <!-- Voice Pitch -->
+        <div>
+          <label class="block text-sm font-medium mb-2 text-slate-300">
+            Voice Pitch
+          </label>
+          <input 
+            type="range" 
+            id="voicePitch" 
+            min="0.5" 
+            max="2" 
+            step="0.1" 
+            value="1" 
+            class="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"
+          >
+          <div class="text-xs text-slate-400 mt-2 flex justify-between">
+            <span>Lower</span>
+            <span>Current: <span id="pitchValue" class="text-blue-400">1.0</span></span>
+            <span>Higher</span>
+          </div>
+        </div>
+
+        <!-- Auto-speak Toggle -->
+        <div class="flex items-center justify-between">
+          <div>
+            <label class="block text-sm font-medium text-slate-300">
+              Auto-speak Responses
+            </label>
+            <p class="text-xs text-slate-500 mt-1">
+              AI will speak responses automatically
+            </p>
+          </div>
+          <input 
+            type="checkbox" 
+            id="autoSpeak" 
+            checked 
+            class="w-5 h-5 rounded bg-slate-700 border-slate-600"
+          >
+        </div>
+
+        <!-- Test Button -->
+        <button id="testVoiceBtn" class="btn-secondary w-full">
+          <i data-lucide="volume-2" class="w-4 h-4 inline mr-2"></i>
+          Test Voice
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== SCRIPTS ==================== -->
+  
+  <!-- Initialize Lucide Icons -->
+  <script>
+    // Initialize icons immediately
+    if (typeof lucide !== 'undefined') {
+      lucide.createIcons();
+    }
+  </script>
+
+  <!-- Load Voice Call System -->
+  <script src="/static/voice-call.js"></script>
+
+  <!-- Re-initialize icons after dynamic content -->
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      // Re-create icons after page load
+      setTimeout(() => {
+        if (typeof lucide !== 'undefined') {
+          lucide.createIcons();
+        }
+      }, 100);
+    });
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,14 @@
+flask
+flask-cors
+flask-socketio
+python-dotenv
+eventlet
+
+pinecone-client
+llama-index
+llama-index-llms-groq
+llama-index-embeddings-huggingface
+llama-index-vector-stores-pinecone
+
+huggingface-hub
+sentence-transformers
